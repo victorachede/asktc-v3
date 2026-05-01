@@ -76,6 +76,7 @@ export default function RoomPage() {
   // Branding — fires once event loads and host_id is known
   const { branding } = useBranding(event?.host_id)
 
+  // ─── FIXED: handleRealtimePayload now correctly handles pending → approved ───
   const handleRealtimePayload = useCallback((payload: any) => {
     if (payload.eventType === 'INSERT') {
       const q = payload.new as Question
@@ -86,16 +87,33 @@ export default function RoomPage() {
         })
       }
     }
-    if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-      setQuestions((prev) =>
-        prev
-          .map((q) => (payload.eventType === 'UPDATE' && q.id === payload.new.id ? (payload.new as Question) : q))
-          .filter((q) => {
-            if (payload.eventType === 'DELETE' && q.id === payload.old.id) return false
-            return ['approved', 'on_screen', 'answered'].includes(q.status)
-          })
-          .sort((a, b) => b.votes - a.votes)
-      )
+
+    if (payload.eventType === 'UPDATE') {
+      const q = payload.new as Question
+      const isVisible = ['approved', 'on_screen', 'answered'].includes(q.status)
+
+      setQuestions((prev) => {
+        const exists = prev.find(item => item.id === q.id)
+
+        if (!isVisible) {
+          // e.g. question was un-approved or rejected — remove it
+          return prev.filter(item => item.id !== q.id)
+        }
+
+        if (exists) {
+          // already visible, just update it (status change, vote count, etc.)
+          return prev
+            .map(item => item.id === q.id ? q : item)
+            .sort((a, b) => b.votes - a.votes)
+        } else {
+          // was pending, now approved by mod — prepend it
+          return [q, ...prev]
+        }
+      })
+    }
+
+    if (payload.eventType === 'DELETE') {
+      setQuestions((prev) => prev.filter(q => q.id !== payload.old.id))
     }
   }, [])
 
