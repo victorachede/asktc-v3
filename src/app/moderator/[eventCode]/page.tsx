@@ -57,7 +57,8 @@ export default function ModeratorPage() {
   const [editableTranscript, setEditableTranscript] = useState('')
   const [askedByVoice, setAskedByVoice] = useState('')
   const [submittingVoice, setSubmittingVoice] = useState(false)
-  const recognitionRef = useRef<any>(null)
+  const dgSocketRef = useRef<WebSocket | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const accumulatedRef = useRef<string>('')
   const [voiceError, setVoiceError] = useState<string | null>(null)
 
@@ -312,34 +313,72 @@ export default function ModeratorPage() {
     })
   }
 
-  // ─── VOICE ────────────────────────────────────────────────────────────────
+  // ─── VOICE (Deepgram streaming) ───────────────────────────────────────────
 
-  function startVoiceQuestion() {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) { setVoiceError('Voice recognition not supported. Please use Chrome or Edge.'); return }
-    recognitionRef.current?.abort()
+  async function startVoiceQuestion() {
+    // Clean up any previous session
+    dgSocketRef.current?.close()
+    mediaRecorderRef.current?.stream?.getTracks().forEach(t => t.stop())
     accumulatedRef.current = ''
     setVoiceError(null)
-    const recognition = new SpeechRecognition()
-    recognitionRef.current = recognition
-    recognition.lang = 'en'
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.maxAlternatives = 3
-    recognition.onstart = () => { setVoiceState('listening'); setInterimTranscript(''); setFinalTranscript('') }
-    recognition.onresult = (e: any) => {
-      let interim = '', newFinal = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const result = e.results[i]
-        const best = [...Array(result.length)].map((_, j) => result[j]).sort((a: any, b: any) => b.confidence - a.confidence)[0]
-        if (result.isFinal) newFinal += best.transcript + ' '
-        else interim += best.transcript
-      }
-      if (newFinal) { accumulatedRef.current += newFinal; setFinalTranscript(accumulatedRef.current) }
-      setInterimTranscript(interim)
+    setInterimTranscript('')
+    setFinalTranscript('')
+
+    // Fetch a short-lived Deepgram token from our API route
+    let token: string
+    try {
+      const res = await fetch('/api/deepgram/token')
+      if (!res.ok) throw new Error('Could not get transcription token')
+      const json = await res.json()
+      token = json.key
+    } catch (e: any) {
+      setVoiceError('Microphone setup failed. Check your DEEPGRAM_API_KEY env var.')
+      return
     }
-    recognition.onerror = (e: any) => { if (e.error === 'no-speech') return; stopListening() }
-    recognition.onend = () => {
+
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      setVoiceError('Microphone permission denied.')
+      return
+    }
+
+    const socket = new WebSocket(
+      `wss://api.deepgram.com/v1/listen?language=en&model=nova-2&punctuate=true&interim_results=true&smart_format=true`,
+      ['token', token]
+    )
+    dgSocketRef.current = socket
+
+    socket.onopen = () => {
+      setVoiceState('listening')
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      mediaRecorderRef.current = recorder
+      recorder.ondataavailable = (e) => {
+        if (socket.readyState === WebSocket.OPEN && e.data.size > 0) socket.send(e.data)
+      }
+      recorder.start(250)
+    }
+
+    socket.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data)
+        const alt = data?.channel?.alternatives?.[0]
+        if (!alt) return
+        const transcript = alt.transcript as string
+        if (!transcript) return
+        if (data.is_final) {
+          accumulatedRef.current += transcript + ' '
+          setFinalTranscript(accumulatedRef.current)
+          setInterimTranscript('')
+        } else {
+          setInterimTranscript(transcript)
+        }
+      } catch {}
+    }
+
+    socket.onclose = () => {
+      stream.getTracks().forEach(t => t.stop())
       setVoiceState((prev) => {
         if (prev === 'listening') {
           const text = accumulatedRef.current.trim()
@@ -348,12 +387,18 @@ export default function ModeratorPage() {
         }
         return prev
       })
+      setInterimTranscript('')
     }
-    recognition.start()
+
+    socket.onerror = () => {
+      setVoiceError('Transcription error. Check your Deepgram key.')
+      stopListening()
+    }
   }
 
   function stopListening() {
-    recognitionRef.current?.stop()
+    mediaRecorderRef.current?.stop()
+    dgSocketRef.current?.close()
     const text = accumulatedRef.current.trim() || interimTranscript.trim()
     if (text) { setEditableTranscript(text); setVoiceState('review') }
     else setVoiceState('idle')
@@ -361,7 +406,8 @@ export default function ModeratorPage() {
   }
 
   function cancelVoice() {
-    recognitionRef.current?.abort()
+    mediaRecorderRef.current?.stop()
+    dgSocketRef.current?.close()
     setVoiceState('idle'); setInterimTranscript(''); setFinalTranscript(''); setEditableTranscript(''); setAskedByVoice('')
   }
 

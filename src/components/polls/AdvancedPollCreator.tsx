@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { AdvancedPollType } from '@/types'
 import { Plus, Trash2, Image as ImageIcon } from 'lucide-react'
 
@@ -56,39 +55,22 @@ export function AdvancedPollCreator({ eventId, onCreated }: AdvancedPollCreatorP
         return
       }
 
-      const supabase = createClient()
+      // Uses the server API route (service role) to bypass RLS — direct client inserts 403
+      const res = await fetch('/api/polls/advanced', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId,
+          pollType,
+          title,
+          description: description || undefined,
+          options,
+          images: pollType === 'image_choice' ? images : undefined,
+        }),
+      })
 
-      const { data: poll, error: pollError } = await supabase
-        .from('advanced_polls')
-        .insert([
-          {
-            event_id: eventId,
-            poll_type: pollType,
-            title,
-            description: description || null,
-            is_active: true,
-            show_results: false,
-          },
-        ])
-        .select()
-        .single()
-
-      if (pollError) throw pollError
-
-      // Insert options
-      const optionsData = options.map((text, idx) => ({
-        poll_id: poll.id,
-        option_text: text,
-        option_order: idx,
-        image_url: pollType === 'image_choice' ? images[idx] || null : null,
-        vote_count: 0,
-      }))
-
-      const { error: optionsError } = await supabase
-        .from('poll_options')
-        .insert(optionsData)
-
-      if (optionsError) throw optionsError
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to create poll')
 
       // Reset form
       setTitle('')
@@ -96,7 +78,7 @@ export function AdvancedPollCreator({ eventId, onCreated }: AdvancedPollCreatorP
       setOptions(['', ''])
       setImages(['', ''])
 
-      onCreated?.(poll.id)
+      onCreated?.(json.poll.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create poll')
     } finally {
