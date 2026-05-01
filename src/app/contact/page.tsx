@@ -67,7 +67,7 @@ export default function ContactPage() {
       <div className="max-w-md mx-auto px-6 py-12">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Contact our team</h1>
         <p className="text-sm text-gray-500 mb-8">
-          Have questions about enterprise plans? Fill out the form below and we&apos;ll be in touch.
+          Do you have questions about enterprise plans? Fill out the form below and we&apos;ll be in touch.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
