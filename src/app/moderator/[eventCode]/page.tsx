@@ -131,7 +131,7 @@ export default function ModeratorPage() {
     return () => { supabase.removeChannel(channel) }
   }, [event?.id, polls.length])
 
-  useEffect(() => { recognitionRef.current?.abort() }, [])
+  useEffect(() => { return () => { dgSocketRef.current?.close(); mediaRecorderRef.current?.stream?.getTracks().forEach(t => t.stop()) } }, [])
 
   async function loadModerator() {
     try {
