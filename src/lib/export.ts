@@ -4,10 +4,7 @@ import type { Event, Question } from '@/types'
  * Export event questions to CSV format
  */
 export function exportQuestionsToCSV(event: Event, questions: Question[]): void {
-  if (questions.length === 0) {
-    alert('No questions to export')
-    return
-  }
+  if (questions.length === 0) return
 
   const headers = ['Question', 'Asked By', 'Votes', 'Status', 'Source', 'Email', 'Submitted At']
   const rows = questions.map((q) => [
@@ -33,10 +30,7 @@ export function exportQuestionsToCSV(event: Event, questions: Question[]): void 
  * Export event questions to JSON format
  */
 export function exportQuestionsToJSON(event: Event, questions: Question[]): void {
-  if (questions.length === 0) {
-    alert('No questions to export')
-    return
-  }
+  if (questions.length === 0) return
 
   const data = {
     event: {

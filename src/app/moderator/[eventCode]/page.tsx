@@ -59,6 +59,7 @@ export default function ModeratorPage() {
   const [submittingVoice, setSubmittingVoice] = useState(false)
   const recognitionRef = useRef<any>(null)
   const accumulatedRef = useRef<string>('')
+  const [voiceError, setVoiceError] = useState<string | null>(null)
 
   useEffect(() => { loadModerator() }, [])
 
@@ -315,9 +316,10 @@ export default function ModeratorPage() {
 
   function startVoiceQuestion() {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) { alert('Voice recognition not supported. Use Chrome or Edge.'); return }
+    if (!SpeechRecognition) { setVoiceError('Voice recognition not supported. Please use Chrome or Edge.'); return }
     recognitionRef.current?.abort()
     accumulatedRef.current = ''
+    setVoiceError(null)
     const recognition = new SpeechRecognition()
     recognitionRef.current = recognition
     recognition.lang = 'en'
@@ -489,6 +491,9 @@ export default function ModeratorPage() {
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Voice Question</p>
                     <p className="text-xs text-gray-400 mt-0.5">Capture audience audio — review before posting</p>
+                    {voiceError && (
+                      <p className="text-xs text-red-500 mt-1">{voiceError}</p>
+                    )}
                   </div>
                   <button onClick={startVoiceQuestion} className="flex items-center gap-2 text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                     <Mic size={14} /> Start Recording
