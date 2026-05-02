@@ -379,7 +379,8 @@ export default function ModeratorPage() {
     }
 
     const socket = new WebSocket(
-      `wss://api.deepgram.com/v1/listen?language=en&model=nova-2&punctuate=true&interim_results=true&smart_format=true&token=${encodeURIComponent(token)}`
+      `wss://api.deepgram.com/v1/listen?language=en&model=nova-2&punctuate=true&interim_results=true&smart_format=true`,
+      ['token', token]
     )
     dgSocketRef.current = socket
 
