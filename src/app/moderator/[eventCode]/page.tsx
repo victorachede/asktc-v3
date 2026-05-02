@@ -379,14 +379,16 @@ export default function ModeratorPage() {
     }
 
     const socket = new WebSocket(
-      `wss://api.deepgram.com/v1/listen?language=en&model=nova-2&punctuate=true&interim_results=true&smart_format=true`,
-      ['token', token]
+      `wss://api.deepgram.com/v1/listen?language=en&model=nova-2&punctuate=true&interim_results=true&smart_format=true&token=${encodeURIComponent(token)}`
     )
     dgSocketRef.current = socket
 
     socket.onopen = () => {
       setVoiceState('listening')
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', ''].find(
+        (m) => m === '' || MediaRecorder.isTypeSupported(m)
+      ) ?? ''
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       mediaRecorderRef.current = recorder
       recorder.ondataavailable = (e) => {
         if (socket.readyState === WebSocket.OPEN && e.data.size > 0) socket.send(e.data)
@@ -402,8 +404,10 @@ export default function ModeratorPage() {
         const transcript = alt.transcript as string
         if (!transcript) return
         if (data.is_final) {
-          accumulatedRef.current += transcript + ' '
-          setFinalTranscript(accumulatedRef.current)
+          if (transcript.trim()) {
+            accumulatedRef.current += transcript.trim() + ' '
+            setFinalTranscript(accumulatedRef.current)
+          }
           setInterimTranscript('')
         } else {
           setInterimTranscript(transcript)
