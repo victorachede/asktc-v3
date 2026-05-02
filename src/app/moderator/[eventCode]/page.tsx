@@ -328,11 +328,12 @@ export default function ModeratorPage() {
     let token: string
     try {
       const res = await fetch('/api/deepgram/token')
-      if (!res.ok) throw new Error('Could not get transcription token')
       const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Token request failed')
+      if (!json.key) throw new Error('Server returned no Deepgram key')
       token = json.key
     } catch (e: any) {
-      setVoiceError('Microphone setup failed. Check your DEEPGRAM_API_KEY env var.')
+      setVoiceError(`Microphone setup failed: ${e.message}`)
       return
     }
 
@@ -390,9 +391,13 @@ export default function ModeratorPage() {
       setInterimTranscript('')
     }
 
-    socket.onerror = () => {
-      setVoiceError('Transcription error. Check your Deepgram key.')
-      stopListening()
+    socket.onerror = (ev) => {
+      console.error('[deepgram ws] error', ev)
+      setVoiceError('Deepgram connection failed. Check your API key and project ID.')
+      mediaRecorderRef.current?.stop()
+      stream.getTracks().forEach(t => t.stop())
+      setVoiceState('idle')
+      setInterimTranscript('')
     }
   }
 

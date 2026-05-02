@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     .from('events')
     .select('id')
     .eq('id', eventId)
-    .eq('created_by', user.id)
+    .eq('host_id', user.id)
     .single()
 
   if (eventErr || !event) {
