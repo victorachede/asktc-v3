@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getVoterFingerprint } from '@/lib/utils'
-import type { Event, Question, Poll } from '@/types'
+import type { Event, Question, Poll, AdvancedPoll, PollOption } from '@/types'
 import { PLAN_LIMITS } from '@/types'
 import { RealtimeChannel } from '@supabase/supabase-js'
 import { ChevronUp, Circle, BarChart2, Share2, X, Users } from 'lucide-react'
@@ -60,6 +60,15 @@ export default function RoomPage() {
 
   // Poll state
   const [activePoll, setActivePoll] = useState<Poll | null>(null)
+  const [activeAdvancedPoll, setActiveAdvancedPoll] = useState<AdvancedPoll | null>(null)
+  const [advancedPollVotedIds, setAdvancedPollVotedIds] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const stored = localStorage.getItem(`asktc_adv_poll_votes_${String(eventCode).toUpperCase()}`)
+      return stored ? new Set(JSON.parse(stored)) : new Set()
+    } catch { return new Set() }
+  })
+  const [submittingAdvPollVote, setSubmittingAdvPollVote] = useState(false)
   const [pollVotes, setPollVotes] = useState<number[]>([])
   const [votedPollIds, setVotedPollIds] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set()
@@ -160,6 +169,15 @@ export default function RoomPage() {
         .maybeSingle()
       if (pollData) { setActivePoll(pollData); loadPollVoteCounts(pollData) }
 
+      // Load active advanced poll
+      const { data: advPollData } = await supabase
+        .from('advanced_polls')
+        .select('*, options:poll_options(*)')
+        .eq('event_id', eventData.id)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (advPollData) setActiveAdvancedPoll(advPollData as AdvancedPoll)
+
       // Load word cloud if active
       if (eventData.active_word_cloud) {
         const { data: wcData } = await supabase
@@ -202,6 +220,37 @@ export default function RoomPage() {
               setActivePoll((prev) => prev?.id === p.id ? null : prev)
             }
           }
+        })
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'advanced_polls',
+          filter: `event_id=eq.${eventData.id}`,
+        }, async (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            const p = payload.new
+            if (p.is_active) {
+              const { data } = await supabase
+                .from('advanced_polls')
+                .select('*, options:poll_options(*)')
+                .eq('id', p.id)
+                .single()
+              if (data) setActiveAdvancedPoll(data as AdvancedPoll)
+            } else {
+              setActiveAdvancedPoll((prev) => prev?.id === p.id ? null : prev)
+            }
+          }
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE', schema: 'public', table: 'poll_options',
+        }, async (payload) => {
+          setActiveAdvancedPoll((prev) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              options: (prev.options as PollOption[]).map((o) =>
+                o.id === payload.new.id ? { ...o, ...payload.new } : o
+              ),
+            }
+          })
         })
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'poll_votes',
@@ -339,6 +388,36 @@ export default function RoomPage() {
       setPollVotes((prev) => { const next = [...prev]; next[optionIndex]++; return next })
     }
     setSubmittingPollVote(false)
+  }
+
+  async function handleAdvancedPollVote(optionId: string) {
+    if (!activeAdvancedPoll || advancedPollVotedIds.has(activeAdvancedPoll.id)) return
+    setSubmittingAdvPollVote(true)
+    const fp = getVoterFingerprint()
+    const supabase = createClient()
+    const { error } = await supabase.from('poll_responses').insert({
+      poll_id: activeAdvancedPoll.id,
+      user_fingerprint: fp,
+      response_data: { option_id: optionId },
+    })
+    if (!error) {
+      await supabase.rpc('increment_poll_option_votes', { option_id: optionId })
+      setAdvancedPollVotedIds((prev) => {
+        const next = new Set([...prev, activeAdvancedPoll.id])
+        try { localStorage.setItem(`asktc_adv_poll_votes_${String(eventCode).toUpperCase()}`, JSON.stringify([...next])) } catch {}
+        return next
+      })
+      setActiveAdvancedPoll((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          options: (prev.options as PollOption[]).map((o) =>
+            o.id === optionId ? { ...o, vote_count: o.vote_count + 1 } : o
+          ),
+        }
+      })
+    }
+    setSubmittingAdvPollVote(false)
   }
 
   if (notFound) {
@@ -485,6 +564,63 @@ export default function RoomPage() {
                   )
                 })}
                 <p className="text-xs text-gray-400 pt-1">{pollTotal} vote{pollTotal !== 1 ? 's' : ''} total</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ACTIVE ADVANCED POLL ── */}
+        {activeAdvancedPoll && (
+          <div className="bg-white rounded-2xl border border-purple-200 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart2 size={15} className="text-purple-500" />
+              <p className="text-xs font-semibold text-purple-500 uppercase tracking-widest">
+                {activeAdvancedPoll.poll_type.replace('_', ' ')} Poll
+              </p>
+            </div>
+            <p className="font-semibold text-gray-900 mb-1">{activeAdvancedPoll.title}</p>
+            {activeAdvancedPoll.description && (
+              <p className="text-sm text-gray-500 mb-4">{activeAdvancedPoll.description}</p>
+            )}
+            {!advancedPollVotedIds.has(activeAdvancedPoll.id) ? (
+              <div className="space-y-2">
+                {(activeAdvancedPoll.options as PollOption[])
+                  .sort((a, b) => a.option_order - b.option_order)
+                  .map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleAdvancedPollVote(opt.id)}
+                      disabled={submittingAdvPollVote}
+                      className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-700 hover:border-purple-300 hover:bg-purple-50 transition-colors disabled:opacity-50"
+                    >
+                      {opt.option_text}
+                    </button>
+                  ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(() => {
+                  const opts = (activeAdvancedPoll.options as PollOption[]).sort((a, b) => a.option_order - b.option_order)
+                  const total = opts.reduce((sum, o) => sum + o.vote_count, 0)
+                  return opts.map((opt) => {
+                    const pct = total > 0 ? Math.round((opt.vote_count / total) * 100) : 0
+                    return (
+                      <div key={opt.id}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="text-gray-700">{opt.option_text}</span>
+                          <span className="text-gray-500 font-mono text-xs">{pct}%</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+                <p className="text-xs text-gray-400 pt-1">
+                  {(activeAdvancedPoll.options as PollOption[]).reduce((sum, o) => sum + o.vote_count, 0)} votes total
+                </p>
               </div>
             )}
           </div>
