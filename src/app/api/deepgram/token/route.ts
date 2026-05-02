@@ -35,7 +35,7 @@ export async function GET() {
         },
         body: JSON.stringify({
           comment: `ephemeral-${user.id}`,
-          scopes: ['usage:write'],
+          scopes: ['member'],
           time_to_live_in_seconds: 60,
         }),
       }
