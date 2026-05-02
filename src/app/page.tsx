@@ -1,7 +1,8 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   Mic, Vote, SlidersHorizontal, Monitor, Users, Zap,
-  ChevronUp, Check, ArrowRight,
+  ChevronUp, Check, ArrowRight
 } from 'lucide-react'
 
 // ── DATA ───────────────────────────────────────────────
@@ -75,6 +76,13 @@ const faqs = [
   { q: 'Is there a free trial for Pro?', a: 'The Free plan lets you run your first event end-to-end at no cost. Upgrade when you need more capacity.' },
 ]
 
+// ── CUSTOM X (TWITTER) ICON ─────────────────────────────
+const XIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932 6.064-6.932zm-1.292 19.494h2.039L6.486 3.24H4.298l13.311 17.407z" />
+  </svg>
+)
+
 // ── PAGE ────────────────────────────────────────────────
 export default function HomePage() {
   return (
@@ -124,7 +132,16 @@ export default function HomePage() {
       {/* ── NAV ── */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #f4f4f5' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 32px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, fontWeight: 500, letterSpacing: '0.14em' }}>ASKTC</span>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}>
+            <Image 
+              src="/apple-touch-icon.png" 
+              alt="Logo" 
+              width={22} 
+              height={22} 
+              style={{ objectFit: 'contain' }}
+            />
+            <span style={{ fontSize: 13, fontWeight: 500, letterSpacing: '0.14em' }}>ASKTC</span>
+          </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <Link href="/join" className="hide-mobile" style={{ fontSize: 13, color: '#52525b', padding: '6px 12px', borderRadius: 6, textDecoration: 'none' }}>Join event</Link>
             <Link href="/auth/login" style={{ fontSize: 13, color: '#52525b', padding: '6px 12px', borderRadius: 6, border: '1px solid #e4e4e7', textDecoration: 'none' }}>Login</Link>
@@ -137,7 +154,7 @@ export default function HomePage() {
       <section className="section-padding" style={{ maxWidth: 1100, margin: '0 auto', padding: '96px 32px 0', textAlign: 'center' }}>
         <div className="fade-up" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid #e4e4e7', borderRadius: 99, padding: '5px 14px', marginBottom: 32, fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#52525b' }}>
           <span className="badge-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', flexShrink: 0, display: 'inline-block' }} />
-          live · q&amp;a for modern events
+          live · q&a for modern events
         </div>
 
         <h1 className="fade-up d1" style={{ fontSize: 'clamp(36px, 5.5vw, 60px)', fontWeight: 300, letterSpacing: '-0.04em', lineHeight: 1.08, maxWidth: 680, margin: '0 auto 20px' }}>
@@ -310,7 +327,12 @@ export default function HomePage() {
       {/* ── FOOTER ── */}
       <footer style={{ borderTop: '1px solid #f4f4f5', padding: '28px 32px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <span style={{ fontSize: 12, fontWeight: 500 }}>ASKTC</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 500 }}>ASKTC</span>
+            <a href="https://x.com/asktcco" target="_blank" rel="noopener noreferrer" style={{ color: '#18181b', opacity: 0.8, display: 'flex', alignItems: 'center' }}>
+              <XIcon size={14} />
+            </a>
+          </div>
           <p style={{ fontSize: 11, color: '#a1a1aa', fontFamily: "'DM Mono', monospace" }}>© 2026 ASKTC · built by black sheep co.</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <a href="/terms" style={{ fontSize: 11, color: '#a1a1aa', textDecoration: 'none' }}>Terms</a>
