@@ -2,8 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PADDLE_API = 'https://api.paddle.com'
+const PADDLE_API = process.env.NEXT_PUBLIC_PADDLE_ENV === 'sandbox'
+  ? 'https://sandbox-api.paddle.com'
+  : 'https://api.paddle.com'
 
+  
 const PRICE_IDS: Record<string, Record<string, string>> = {
   pro: {
     monthly: process.env.PADDLE_PRICE_PRO_MONTHLY!,
