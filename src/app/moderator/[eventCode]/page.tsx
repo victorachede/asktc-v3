@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { Event, Question, Panelist, Poll } from '@/types'
+import type { Event, Question, Panelist, Poll, AdvancedPoll, PollOption } from '@/types'
 import {
   Monitor, Play, Square, Mic, MicOff, CheckCircle2,
   XCircle, Tv, UserPlus, Link, Trash2,
@@ -40,6 +40,7 @@ export default function ModeratorPage() {
   const [pollQuestion, setPollQuestion] = useState('')
   const [pollOptions, setPollOptions] = useState(['', ''])
   const [creatingPoll, setCreatingPoll] = useState(false)
+  const [advancedPolls, setAdvancedPolls] = useState<AdvancedPoll[]>([])
   const [pollVoteCounts, setPollVoteCounts] = useState<Record<string, number[]>>({})
   const [isQuiz, setIsQuiz] = useState(false)
   const [correctOption, setCorrectOption] = useState<number | null>(null)
@@ -118,6 +119,36 @@ export default function ModeratorPage() {
     return () => { supabase.removeChannel(channel) }
   }, [event?.id])
 
+  // Realtime advanced polls
+  useEffect(() => {
+    if (!event?.id) return
+    const supabase = createClient()
+    const channel = supabase.channel(`advanced-polls-${event.id}`)
+    channel
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'advanced_polls',
+        filter: `event_id=eq.${event.id}`,
+      }, async (payload) => {
+        if (payload.eventType === 'INSERT') {
+          // Fetch with options
+          const { data } = await supabase
+            .from('advanced_polls')
+            .select('*, options:poll_options(*)')
+            .eq('id', payload.new.id)
+            .single()
+          if (data) setAdvancedPolls(prev => [data as AdvancedPoll, ...prev])
+        }
+        if (payload.eventType === 'UPDATE') {
+          setAdvancedPolls(prev => prev.map(p => p.id === payload.new.id ? { ...p, ...payload.new } : p))
+        }
+        if (payload.eventType === 'DELETE') {
+          setAdvancedPolls(prev => prev.filter(p => p.id !== payload.old.id))
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [event?.id])
+
   // Realtime poll votes
   useEffect(() => {
     if (!event?.id || polls.length === 0) return
@@ -149,14 +180,16 @@ export default function ModeratorPage() {
       }
 
       setEvent(eventData)
-      const [{ data: questionsData }, { data: panelistsData }, { data: pollsData }] = await Promise.all([
+      const [{ data: questionsData }, { data: panelistsData }, { data: pollsData }, { data: advancedPollsData }] = await Promise.all([
         supabase.from('questions').select('*').eq('event_id', eventData.id).order('created_at', { ascending: false }),
         supabase.from('panelists').select('*').eq('event_id', eventData.id).order('created_at', { ascending: true }),
         supabase.from('polls').select('*').eq('event_id', eventData.id).order('created_at', { ascending: false }),
+        supabase.from('advanced_polls').select('*, options:poll_options(*)').eq('event_id', eventData.id).order('created_at', { ascending: false }),
       ])
       setQuestions(questionsData || [])
       setPanelists(panelistsData || [])
       setPolls(pollsData || [])
+      setAdvancedPolls((advancedPollsData as AdvancedPoll[]) || [])
       setLoading(false)
       if (pollsData && pollsData.length > 0) loadPollVotes(pollsData)
     } catch (err: any) {
@@ -759,7 +792,7 @@ export default function ModeratorPage() {
             </div>
 
             {pollMode === 'advanced' ? (
-              <AdvancedPollCreator eventId={event!.id} onCreated={() => setPollMode('basic')} />
+              <AdvancedPollCreator eventId={event!.id} onCreated={(_id) => setPollMode('basic')} />
             ) : (
               <>
             {showPollForm && (
@@ -855,6 +888,37 @@ export default function ModeratorPage() {
               })}
             </div>
             </>
+            )}
+
+            {/* Advanced Polls */}
+            {advancedPolls.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Advanced Polls</p>
+                {advancedPolls.map((poll) => (
+                  <div key={poll.id} className="border border-gray-100 rounded-xl p-3">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-xs text-indigo-500 font-medium capitalize">{poll.poll_type.replace('_', ' ')}</p>
+                        <p className="text-sm font-medium text-gray-900">{poll.title}</p>
+                        {poll.description && <p className="text-xs text-gray-400 mt-0.5">{poll.description}</p>}
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${poll.is_active ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                        {poll.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    {poll.options && poll.options.length > 0 && (
+                      <div className="space-y-1">
+                        {(poll.options as PollOption[]).sort((a, b) => a.option_order - b.option_order).map((opt) => (
+                          <div key={opt.id} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">{opt.option_text}</span>
+                            <span className="text-gray-400 font-mono">{opt.vote_count} votes</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
