@@ -31,20 +31,37 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text()
   const signature = req.headers.get('paddle-signature') || ''
 
+  console.log('[webhook] received')
+  console.log('[webhook] signature:', signature ? 'present' : 'MISSING')
+  console.log('[webhook] body preview:', rawBody.slice(0, 200))
+
   try {
     const valid = verifyPaddleWebhook(rawBody, signature, process.env.PADDLE_WEBHOOK_SECRET!)
-    if (!valid) return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-  } catch {
+    console.log('[webhook] signature valid:', valid)
+    if (!valid) {
+      console.log('[webhook] INVALID SIGNATURE')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+  } catch (e) {
+    console.log('[webhook] signature error:', e)
     return NextResponse.json({ error: 'Signature error' }, { status: 401 })
   }
 
   const event = JSON.parse(rawBody)
+  console.log('[webhook] event_type:', event.event_type)
+  console.log('[webhook] custom_data:', event.data?.custom_data)
 
   // ── First payment ─────────────────────────────────────────────
   if (event.event_type === 'transaction.completed') {
     const txn = event.data
     const { user_id: userId, plan, cycle } = txn.custom_data || {}
-    if (!userId || !plan || !cycle) return NextResponse.json({ error: 'Missing custom data' }, { status: 400 })
+
+    console.log('[webhook] transaction.completed — userId:', userId, 'plan:', plan, 'cycle:', cycle)
+
+    if (!userId || !plan || !cycle) {
+      console.log('[webhook] missing custom data')
+      return NextResponse.json({ error: 'Missing custom data' }, { status: 400 })
+    }
 
     const now = new Date()
     const periodEnd = getPeriodEnd(cycle)
@@ -56,7 +73,12 @@ export async function POST(req: NextRequest) {
       updated_at: now.toISOString(),
     }, { onConflict: 'user_id' })
 
-    if (error) return NextResponse.json({ error: 'DB error' }, { status: 500 })
+    if (error) {
+      console.log('[webhook] DB upsert error:', error)
+      return NextResponse.json({ error: 'DB error' }, { status: 500 })
+    }
+
+    console.log('[webhook] subscription upserted successfully')
 
     await supabase.from('payments').insert({
       user_id: userId,
@@ -69,6 +91,7 @@ export async function POST(req: NextRequest) {
   if (event.event_type === 'subscription.renewed') {
     const sub = event.data
     const { user_id: userId, plan, cycle } = sub.custom_data || {}
+    console.log('[webhook] subscription.renewed — userId:', userId)
     if (userId) {
       const now = new Date()
       const periodEnd = getPeriodEnd(cycle || 'monthly')
@@ -84,6 +107,7 @@ export async function POST(req: NextRequest) {
   // ── Cancellation ──────────────────────────────────────────────
   if (event.event_type === 'subscription.canceled') {
     const userId = event.data?.custom_data?.user_id
+    console.log('[webhook] subscription.canceled — userId:', userId)
     if (userId) {
       await supabase.from('subscriptions').update({
         status: 'cancelled', plan: 'free', updated_at: new Date().toISOString(),
