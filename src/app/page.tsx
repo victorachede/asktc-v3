@@ -48,19 +48,31 @@ const plans = [
     features: ['1 event', '50 questions per event', '30 audience members', 'Basic Q&A flow', 'ASKTC watermark'],
   },
   {
- name: 'PRO', price: '$9', period: '/month · or $72/year',    featured: true, badge: 'most popular', cta: 'Start Pro', href: '/auth/signup',
+    name: 'PRO', price: '$9', period: '/month · or $72/year',
+    featured: true, badge: 'most popular', cta: 'Start Pro', href: '/auth/signup',
     features: ['Unlimited events', '200 questions per event', '200 audience members', 'Voice questions', 'Panelist assignment', 'No watermark', 'Basic analytics'],
   },
   {
-name: 'ENTERPRISE', price: '$29', period: '/month · or $232/year',    featured: false, cta: 'Contact us', href: '/contact',
+    name: 'ENTERPRISE', price: '$29', period: '/month · or $232/year',
+    featured: false, cta: 'Contact us', href: '/contact',
     features: ['Everything in Pro', 'Unlimited questions & audience', 'Custom branding', 'Multiple moderators', 'Export PDF / CSV', 'Advanced analytics', 'Dedicated support'],
   },
 ]
 
-const avatars = [
-  { initials: 'TK', bg: '#6366f1' }, { initials: 'AI', bg: '#ec4899' },
-  { initials: 'OB', bg: '#f59e0b' }, { initials: 'JD', bg: '#14b8a6' },
-  { initials: '+4', bg: '#64748b' },
+const usedFor = [
+  { emoji: '🎤', label: 'Conferences' },
+  { emoji: '⛪', label: 'Churches' },
+  { emoji: '🏢', label: 'Town halls' },
+  { emoji: '🎓', label: 'Universities' },
+  { emoji: '🚀', label: 'Startup events' },
+]
+
+const faqs = [
+  { q: 'Do attendees need an account?', a: 'No. Audience members join via a link or QR code — no signup, no app download required.' },
+  { q: 'Can I use this for a church service or town hall?', a: 'Absolutely. ASKTC works for any format where an audience submits questions to a speaker or panel.' },
+  { q: 'What happens to my event data after it ends?', a: 'Your questions and analytics stay in your dashboard. You can export them anytime on the Pro or Enterprise plan.' },
+  { q: 'Can multiple moderators manage the same event?', a: 'Multiple moderator accounts are available on the Enterprise plan.' },
+  { q: 'Is there a free trial for Pro?', a: 'The Free plan lets you run your first event end-to-end at no cost. Upgrade when you need more capacity.' },
 ]
 
 // ── PAGE ────────────────────────────────────────────────
@@ -85,12 +97,16 @@ export default function HomePage() {
         .badge-dot { animation: pulseDot 2s infinite; }
 
         .q-action:hover { border-color: #a1a1aa !important; color: #0f0f0f !important; }
+        .faq-item { border-bottom: 1px solid #f4f4f5; padding: 20px 0; }
+        .faq-item:first-child { border-top: 1px solid #f4f4f5; }
 
         .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
         .dash-grid { display: grid; grid-template-columns: 220px 1fr; min-height: 360px; }
 
         @media (max-width: 900px) {
           .grid-3 { grid-template-columns: 1fr; }
+          .grid-5 { grid-template-columns: repeat(3, 1fr); }
           .dash-grid { grid-template-columns: 1fr; }
           .hide-mobile { display: none; }
           .section-padding { padding: 64px 20px !important; }
@@ -101,6 +117,7 @@ export default function HomePage() {
 
         @media (max-width: 480px) {
           h1 { font-size: 38px !important; }
+          .grid-5 { grid-template-columns: repeat(2, 1fr); }
         }
       `}</style>
 
@@ -141,13 +158,13 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="fade-up d4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 64 }}>
-          <div style={{ display: 'flex' }}>
-            {avatars.map((av, i) => (
-              <div key={av.initials} style={{ width: 26, height: 26, borderRadius: '50%', border: '2px solid #fff', background: av.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 500, color: '#fff', marginLeft: i === 0 ? 0 : -7, fontFamily: "'DM Mono', monospace" }}>{av.initials}</div>
-            ))}
-          </div>
-          <span style={{ fontSize: 12, color: '#a1a1aa', fontFamily: "'DM Mono', monospace" }}>Trusted by 400+ organizers</span>
+        {/* Used for */}
+        <div className="fade-up d4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 64 }}>
+          {usedFor.map((u, i) => (
+            <span key={u.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#71717a', padding: '4px 12px', borderRadius: 99, border: '1px solid #f4f4f5', background: '#fafafa', fontFamily: "'DM Mono', monospace" }}>
+              {u.emoji} {u.label}
+            </span>
+          ))}
         </div>
 
         {/* Dashboard Preview */}
@@ -239,6 +256,7 @@ export default function HomePage() {
       {/* ── PRICING ── */}
       <section className="section-padding" style={{ background: '#fafafa', borderTop: '1px solid #f4f4f5', padding: '88px 32px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <h2 style={{ fontSize: 28, fontWeight: 300, textAlign: 'center', marginBottom: 48, letterSpacing: '-0.02em' }}>Simple pricing</h2>
           <div className="grid-3">
             {plans.map(p => (
               <div key={p.name} style={{ background: p.featured ? '#18181b' : '#fff', border: '1px solid #e4e4e7', borderRadius: 20, padding: 28, display: 'flex', flexDirection: 'column' }}>
@@ -263,19 +281,44 @@ export default function HomePage() {
         </div>
       </section>
 
-     {/* ── FOOTER ── */}
-<footer style={{ borderTop: '1px solid #f4f4f5', padding: '28px 32px' }}>
-  <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-    <span style={{ fontSize: 12, fontWeight: 500 }}>ASKTC</span>
-    <p style={{ fontSize: 11, color: '#a1a1aa', fontFamily: "'DM Mono', monospace" }}>© 2026 ASKTC · built by black sheep co.</p>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-      <a href="/terms" style={{ fontSize: 11, color: '#a1a1aa', textDecoration: 'none' }}>Terms</a>
-      <a href="/privacy" style={{ fontSize: 11, color: '#a1a1aa', textDecoration: 'none' }}>Privacy</a>
-      <a href="/refund" style={{ fontSize: 11, color: '#a1a1aa', textDecoration: 'none' }}>Refund</a>
-      <a href="https://github.com/victorachede/asktc-acc" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#a1a1aa', textDecoration: 'none' }}>GitHub</a>
-    </div>
-  </div>
-</footer>
+      {/* ── FAQ ── */}
+      <section className="section-padding" style={{ padding: '88px 32px' }}>
+        <div style={{ maxWidth: 640, margin: '0 auto' }}>
+          <h2 style={{ fontSize: 28, fontWeight: 300, textAlign: 'center', marginBottom: 48, letterSpacing: '-0.02em' }}>Common questions</h2>
+          <div>
+            {faqs.map(f => (
+              <div key={f.q} className="faq-item">
+                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>{f.q}</p>
+                <p style={{ fontSize: 13, color: '#52525b', lineHeight: 1.7, fontWeight: 300 }}>{f.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA BANNER ── */}
+      <section style={{ background: '#18181b', padding: '72px 32px', textAlign: 'center' }}>
+        <h2 style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 300, color: '#fff', letterSpacing: '-0.03em', marginBottom: 16 }}>
+          Ready to run a better Q&A?
+        </h2>
+        <p style={{ fontSize: 14, color: '#71717a', marginBottom: 32, fontWeight: 300 }}>Free to start. No card needed.</p>
+        <Link href="/auth/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 500, color: '#000', background: '#fff', padding: '12px 28px', borderRadius: 10, textDecoration: 'none' }}>
+          Get started free <ArrowRight size={14} />
+        </Link>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{ borderTop: '1px solid #f4f4f5', padding: '28px 32px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <span style={{ fontSize: 12, fontWeight: 500 }}>ASKTC</span>
+          <p style={{ fontSize: 11, color: '#a1a1aa', fontFamily: "'DM Mono', monospace" }}>© 2026 ASKTC · built by black sheep co.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <a href="/terms" style={{ fontSize: 11, color: '#a1a1aa', textDecoration: 'none' }}>Terms</a>
+            <a href="/privacy" style={{ fontSize: 11, color: '#a1a1aa', textDecoration: 'none' }}>Privacy</a>
+            <a href="/refund" style={{ fontSize: 11, color: '#a1a1aa', textDecoration: 'none' }}>Refund</a>
+          </div>
+        </div>
+      </footer>
 
     </main>
   )
